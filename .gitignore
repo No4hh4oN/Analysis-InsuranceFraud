@@ -10,6 +10,3 @@ __pycache__/
 .idea/
 .vscode/
 
-# 원본 데이터 — 크기·민감 정보로 git에는 올리지 않음 (팀 공유는 별도 채널)
-CLAIM_DATA.csv
-CUST_DATA.csv
