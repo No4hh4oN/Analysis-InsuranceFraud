@@ -1,0 +1,24 @@
+{
+  "model": "step11 weighted voting (LR/LGBM/XGB + new features)",
+  "weights": {
+    "lr": 0.1,
+    "lgbm": 0.6,
+    "xgb": 0.3
+  },
+  "best_threshold": 0.61,
+  "best_f1": 0.6302142051860203,
+  "best_precision": 0.6417910447761194,
+  "best_recall": 0.6190476190476191,
+  "default_t05": {
+    "f1": 0.6153453989293908,
+    "precision": 0.5701464336324988,
+    "recall": 0.668327796234773
+  },
+  "step08_compare": {
+    "best_threshold": 0.58,
+    "best_f1": 0.6289871292669278,
+    "best_precision": 0.6357466063348416,
+    "best_recall": 0.6223698781838317,
+    "delta_f1": 0.0012270759190925462
+  }
+}

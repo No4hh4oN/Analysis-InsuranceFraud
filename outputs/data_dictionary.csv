@@ -1,0 +1,65 @@
+﻿테이블,컬럼,의미(추정),dtype,결측률(%),고유값수
+CUST,CUST_ID,고객 고유번호,int64,0.0,22400
+CUST,DIVIDED_SET,"데이터 분할 (1=train, 2=test)",int64,0.0,2
+CUST,SIU_CUST_YN,★ 타겟: 보험사기 의심 고객 여부 (Y/N),str,8.0,2
+CUST,SEX,"성별 (1=남, 2=여)",int64,0.0,2
+CUST,AGE,나이,int64,0.0,88
+CUST,RESI_COST,거주 비용,int64,0.0,6663
+CUST,RESI_TYPE_CODE,주거 형태 코드,float64,5.6,10
+CUST,FP_CAREER,본인 보험설계사 경력 여부 (Y/N),str,0.0,2
+CUST,CUST_RGST,고객 등록 연월 (YYYYMM),float64,2.04,372
+CUST,CTPR,거주 시·도,str,2.77,17
+CUST,OCCP_GRP_1,직업 대분류,str,2.66,8
+CUST,OCCP_GRP_2,직업 소분류,str,2.66,25
+CUST,TOTALPREM,총 납입 보험료,float64,25.85,16500
+CUST,MINCRDT,최저 신용도,float64,42.3,13
+CUST,MAXCRDT,최고 신용도,float64,42.3,13
+CUST,WEDD_YN,결혼 여부,str,2.11,2
+CUST,MATE_OCCP_GRP_1,배우자 직업 대분류,str,52.8,8
+CUST,MATE_OCCP_GRP_2,배우자 직업 소분류,str,52.8,24
+CUST,CHLD_CNT,자녀 수,float64,2.11,7
+CUST,LTBN_CHLD_AGE,막내 자녀 나이,float64,2.11,36
+CUST,MAX_PAYM_YM,최대 납입 연월,float64,28.96,243
+CUST,MAX_PRM,최대 보험료,float64,28.96,13706
+CUST,CUST_INCM,고객 소득,float64,23.5,3619
+CUST,RCBASE_HSHD_INCM,건강보험 기준 가구 소득,int64,0.0,7677
+CUST,JPBASE_HSHD_INCM,직장 기준 가구 소득,float64,3.04,7760
+CLAIM,CUST_ID,고객 고유번호,int64,0.0,22400
+CLAIM,POLY_NO,보험증권 번호,int64,0.0,28031
+CLAIM,ACCI_OCCP_GRP1,사고 시 직업 대분류,str,1.19,8
+CLAIM,ACCI_OCCP_GRP2,사고 시 직업 소분류,str,1.19,25
+CLAIM,CHANG_FP_YN,설계사 변경 여부,str,0.0,2
+CLAIM,CNTT_RECP_SQNO,접수 일련번호,int64,0.0,119020
+CLAIM,RECP_DATE,접수일자 (YYYYMMDD),int64,0.0,2610
+CLAIM,ORIG_RESN_DATE,최초 사유일자,int64,0.0,4084
+CLAIM,RESN_DATE,사유일자,int64,0.0,3828
+CLAIM,CRNT_PROG_DVSN,현재 진행 구분,int64,0.0,6
+CLAIM,ACCI_DVSN,사고 구분 (1=상해/2=질병 추정),int64,0.0,3
+CLAIM,CAUS_CODE,원인 코드,str,0.0,943
+CLAIM,CAUS_CODE_DTAL,원인 코드 상세,str,0.0,136
+CLAIM,DSAS_NAME,질병/상병명,str,0.0,63420
+CLAIM,DMND_RESN_CODE,청구 사유 코드,int64,0.0,8
+CLAIM,DMND_RSCD_SQNO,청구 사유 일련번호,int64,0.0,35
+CLAIM,HOSP_OTPA_STDT,통원/입원 시작일,float64,27.37,3823
+CLAIM,HOSP_OTPA_ENDT,통원/입원 종료일,float64,27.37,3798
+CLAIM,RESL_CD1,결과 코드(주상병),str,0.0,912
+CLAIM,RESL_NM1,결과명(주상병명),str,0.0,911
+CLAIM,VLID_HOSP_OTDA,유효 입원/통원 일수,int64,0.0,194
+CLAIM,HOUSE_HOSP_DIST,자택-병원 거리,float64,14.32,8467
+CLAIM,HOSP_CODE,병원 코드,float64,0.01,12537
+CLAIM,ACCI_HOSP_ADDR,사고/병원 주소,str,8.46,17
+CLAIM,HOSP_SPEC_DVSN,병원 전문 구분,float64,0.01,12
+CLAIM,CHME_LICE_NO,한방/일반 면허 구분,int64,0.0,25702
+CLAIM,PAYM_DATE,지급일,float64,0.01,2610
+CLAIM,DMND_AMT,청구 금액,int64,0.0,19908
+CLAIM,PAYM_AMT,지급 금액,int64,0.0,15040
+CLAIM,PMMI_DLNG_YN,의료비 처리 구분 Y/N,str,0.0,2
+CLAIM,SELF_CHAM,본인부담금,float64,84.06,10587
+CLAIM,NON_PAY,비급여,float64,84.06,9472
+CLAIM,TAMT_SFCA,총 본인부담,float64,84.06,1803
+CLAIM,PATT_CHRG_TOTA,환자부담총액,float64,84.06,14403
+CLAIM,DSCT_AMT,할인 금액,float64,84.06,1656
+CLAIM,COUNT_TRMT_ITEM,치료 항목 수,float64,84.06,5
+CLAIM,DCAF_CMPS_XCPA,공제 후 자기부담 제외 금액,float64,93.23,2830
+CLAIM,NON_PAY_RATIO,비급여 비율,float64,0.0,14924
+CLAIM,HEED_HOSP_YN,요주의 병원 여부,str,0.0,2

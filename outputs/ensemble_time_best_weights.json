@@ -1,0 +1,18 @@
+{
+  "best_weights": {
+    "lr": 0.0,
+    "lgbm": 0.8,
+    "xgb": 0.2
+  },
+  "best_pr_auc": 0.6850414279001569,
+  "lgbm_params": {
+    "n_estimators": 796,
+    "learning_rate": 0.01839416678149521,
+    "num_leaves": 90,
+    "min_child_samples": 63,
+    "subsample": 0.7715925903240886,
+    "colsample_bytree": 0.8793177441915772,
+    "reg_alpha": 6.189776343666531e-08,
+    "reg_lambda": 8.038061038966298
+  }
+}

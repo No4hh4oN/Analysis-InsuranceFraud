@@ -1,0 +1,9 @@
+{
+  "best_weights": {
+    "lr": 0.05,
+    "lgbm": 0.6,
+    "xgb": 0.35
+  },
+  "best_pr_auc": 0.6653634708569305,
+  "single_best_pr_auc": 0.6606928842364598
+}
