@@ -169,7 +169,7 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 | **베이스라인** | `LogisticRegression(class_weight="balanced", max_iter=1000)` | 선형 신호 확인 + 계수 부호로 H1~H5 해석 |
 | **메인** | `LightGBM` (`scale_pos_weight ≈ 10`, `n_estimators=500`, `learning_rate=0.05`) | 비선형·상호작용 포착 |
 
-> RF/XGB는 시간 남으면 보조 비교. 본 보고에서는 **LR vs LightGBM** 2-way 비교를 PPT 메인 슬라이드로 가져간다.
+> 본 보고서에서는 **LR vs LightGBM** 2-way 비교를 메인으로 가져간다. XGBoost 는 앙상블 단계 (step09 이후) 에서 합류.
 
 ### 3.2 평가지표
 
@@ -183,7 +183,7 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 ### 3.3 해석
 
 - LightGBM `feature_importance` (gain) + `permutation_importance` (sklearn) 두 가지로 교차 검증
-- 상위 변수가 H1~H5 가설과 일치하는지 점검 → 일치하면 PPT 스토리 닫힘
+- 상위 변수가 H1~H5 가설과 일치하는지 점검 → 일치하면 *EDA → 가설 → 모델 검증* 닫힘
 - LR 계수의 부호로 변수 영향 방향성 추가 설명
 
 ### 3.4 오버샘플링 — 시도 후 기각 (step06)
@@ -247,7 +247,7 @@ EDA의 챕터별 사기율 차이(M 23% vs C 7.8%)를 *모델 신호로 직접 �
 
 step10 의 새 피처를 step09 앙상블에 결합. fold 안에서 interaction + target encoding 둘 다 적용한 뒤 LR + LGBM + XGB 3개 모델 OOF → 가중치 grid search.
 
-**단계별 누적 PR-AUC** — `figures/ensemble_progression.png` (PPT 메인 슬라이드)
+**단계별 누적 PR-AUC** — `figures/ensemble_progression.png`
 
 | 단계 | PR-AUC | Δ from baseline |
 |---|---|---|
@@ -450,7 +450,7 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 
 ### 3.15 최종 모델 — 8단계 누적 (step18)
 
-**최종 8단계 누적 PR-AUC** — `figures/ensemble_progression_v4.png` (PPT 메인)
+**최종 8단계 누적 PR-AUC** — `figures/ensemble_progression_v4.png`
 
 | 단계 | PR-AUC | Δ from baseline |
 |---|---|---|
