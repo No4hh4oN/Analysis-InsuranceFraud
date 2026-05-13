@@ -1,0 +1,19 @@
+{
+  "scaler": "hybrid",
+  "standard_cols": [
+    "RESI_COST",
+    "TOTALPREM",
+    "MAX_PRM",
+    "CUST_INCM",
+    "RCBASE_HSHD_INCM",
+    "JPBASE_HSHD_INCM"
+  ],
+  "best_weights": {
+    "lr": 0.05,
+    "lgbm": 0.65,
+    "xgb": 0.3
+  },
+  "best_pr_auc": 0.7000294742810963,
+  "step15_pr_auc": 0.6987788123979414,
+  "delta_pp": 0.12506618831549243
+}

@@ -20,11 +20,18 @@ from sklearn.preprocessing import OneHotEncoder, RobustScaler, StandardScaler
 
 
 # 전처리 파이프라인 빌더
-# Scaler 비교 축 (plan.md §2.3)
+# Scaler 비교 축
 SCALERS: dict[str, type] = {
     "standard": StandardScaler,
     "robust":   RobustScaler,
 }
+
+# Hybrid 모드 — 의미상 같은 그룹(금융/소득)만 StandardScaler, 나머지 RobustScaler.
+# 팀 토론 반영: 동일 단위의 금융 변수는 별도 그룹으로 통일된 스케일러 적용.
+STANDARD_SCALE_COLS: tuple[str, ...] = (
+    "RESI_COST", "TOTALPREM", "MAX_PRM",
+    "CUST_INCM", "RCBASE_HSHD_INCM", "JPBASE_HSHD_INCM",
+)
 
 
 def build_preprocessor(
@@ -32,37 +39,61 @@ def build_preprocessor(
     cat_cols: Sequence[str],
     scaler: str = "robust",
 ) -> ColumnTransformer:
-    """수치·범주 컬럼에 같은 정책을 적용하는 ColumnTransformer.
+    """수치·범주 컬럼에 정책을 적용하는 ColumnTransformer.
 
     Parameters
     ----------
     num_cols, cat_cols
         features.split_columns() 결과를 그대로 넘기면 된다.
     scaler
-        "standard" | "robust" — 우리 집계 피처는 long-tail/이상치 특성이 강해
-        기본값을 robust 로 둔다. 비교는 단일 인자만 바꿔 호출하면 됨.
+        "standard" | "robust" | "hybrid"
+          - standard / robust : 모든 수치 컬럼에 동일 스케일러
+          - hybrid            : STANDARD_SCALE_COLS 6개만 StandardScaler,
+                                나머지 수치는 RobustScaler
 
     Returns
     -------
     sklearn ColumnTransformer (sparse=False) — 모델 앞단에 그대로 부착.
     """
+    cat_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("ohe",     OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+    ])
+
+    if scaler == "hybrid":
+        std_cols = [c for c in STANDARD_SCALE_COLS if c in num_cols]
+        rob_cols = [c for c in num_cols if c not in std_cols]
+        std_pipe = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler",  StandardScaler()),
+        ])
+        rob_pipe = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler",  RobustScaler()),
+        ])
+        return ColumnTransformer(
+            transformers=[
+                ("num_std", std_pipe, std_cols),
+                ("num_rob", rob_pipe, rob_cols),
+                ("cat",     cat_pipe, list(cat_cols)),
+            ],
+            remainder="drop",
+            verbose_feature_names_out=False,
+        )
+
     if scaler not in SCALERS:
-        raise ValueError(f"scaler must be one of {list(SCALERS)}, got {scaler!r}")
+        raise ValueError(f"scaler must be 'standard' | 'robust' | 'hybrid', got {scaler!r}")
 
     num_pipe = Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler",  SCALERS[scaler]()),
-    ])
-    cat_pipe = Pipeline([
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("ohe",     OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
     ])
     return ColumnTransformer(
         transformers=[
             ("num", num_pipe, list(num_cols)),
             ("cat", cat_pipe, list(cat_cols)),
         ],
-        remainder="drop",  # META 컬럼 등 명시 안 한 컬럼은 버린다 (안전장치)
+        remainder="drop",
         verbose_feature_names_out=False,
     )
 

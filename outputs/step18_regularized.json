@@ -1,0 +1,23 @@
+{
+  "lgbm_params": {
+    "n_estimators": 500,
+    "learning_rate": 0.03,
+    "num_leaves": 31,
+    "min_child_samples": 100,
+    "subsample": 0.7,
+    "colsample_bytree": 0.7,
+    "reg_alpha": 0.1,
+    "reg_lambda": 20.0
+  },
+  "best_weights": {
+    "lr": 0.05,
+    "lgbm": 0.35,
+    "xgb": 0.6
+  },
+  "best_pr_auc": 0.7024029783457053,
+  "lgbm_train": 0.9324940919230251,
+  "lgbm_valid": 0.699798859327324,
+  "lgbm_gap": 0.23269523259570113,
+  "step17_gap": 0.2996,
+  "gap_reduction": 0.06690476740429885
+}
