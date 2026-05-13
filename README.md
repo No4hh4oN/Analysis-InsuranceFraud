@@ -16,6 +16,9 @@
 | F1 (default t=0.5) | 0.624 |
 | Train-Valid Gap | 0.233 *(정규화 강화 후 — step17 대비 22% 감소)* |
 
+
+<br>
+
 ### 단계별 누적 PR-AUC — 베이스라인 0.6592 → 최종 0.7024 (+4.32pp)
 
 ![최종 8단계 누적 PR-AUC](figures/ensemble_progression_v4.png)
@@ -23,12 +26,16 @@
 > Baseline (LGBM 단일) 에서 출발해 *피처 개선 → 앙상블 → Optuna LGBM → 시간 피처 → 미사용 변수 → Hybrid scaler → 정규화* 8단계 누적.
 > **모델 측면 +1.22pp vs 변수 측면 +3.10pp** — 변수 탐색이 압도적 ROI.
 
+<br>
+
 ### PR Curve — 3개 모델 + Weighted Voting + 운영점
 
 ![PR Curve 최종](figures/pr_curve_final.png)
 
 > Random baseline(8.8%) 대비 약 8배 위. **상위 20% 조사로 사기 84.9% 적발**.
 > LR(회색 점선) 대비 트리 모델·앙상블이 명확한 우위 — *사기 탐지는 비선형 패턴*.
+
+<br>
 
 ## 디렉토리 구조
 
@@ -41,6 +48,8 @@
 ├── figures/                          EDA / 모델 비교 / progression 차트
 └── README.md                         본 문서 (전체 설계서 + 결과)
 ```
+
+<br><br>
 
 ## 실행
 
@@ -55,7 +64,7 @@ python src/step02_eda.py
 # ...
 python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 ```
-
+<br><br>
 ---
 
 ## 1. EDA 핵심 발견
@@ -63,6 +72,8 @@ python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 ### 1.1 타겟 분포 — 사기율 8.76% 불균형
 
 ![타겟 분포](figures/eda_01_target.png)
+
+<br>
 
 ### 1.2 KCD 챕터별 사기율 — M(요추) 23% vs C(암) 7.8% (3배 차이)
 
@@ -72,6 +83,8 @@ python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 > *C(암)* 는 오히려 정직 (진짜 환자가 많음). → 단순 챕터 비율 변수보다 *챕터별 사기율 prior*
 > 를 직접 주입하면 효과 클 것 (step10 target encoding 동기).
 
+<br>
+
 ### 1.3 청구 패턴 다양성 — Doctor Shopping 신호
 
 ![청구 신호](figures/eda_04_claim_signal.png)
@@ -79,12 +92,16 @@ python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 > 사기 고객은 **청구 3배 · 방문 병원 2.6배 · 의사 6.5배 · 진단명 3.2배** 빈도.
 > 한 사람이 여러 곳을 돌아다니며 청구하는 *doctor shopping* 패턴이 매우 강한 신호.
 
+<br>
+
 ### 1.4 입원·지급액 long-tail 분포
 
 ![수치형 box plot](figures/eda_03_numeric_box.png)
 
 > 모든 청구 집계 변수가 *극단치 = 사기 시그널* 패턴. 입원일수 합계 6.5배, 요주의병원 방문 4.5배.
 > **이상치 제거하지 않음** — 꼬리(tail)가 사기 답이기 때문. RobustScaler 로 흡수.
+
+<br><br>
 
 ---
 
@@ -100,6 +117,7 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 | **H4** | 입원 편향(입원/통원 비율) 이 사기 신호 | 입원일수 합계 6.5배 |
 | **H5** | 요주의병원 방문은 단독 강한 signal | 요주의병원 방문률 4.5배 |
 
+<br><br>
 ---
 
 ## 2. 전처리 파이프라인
@@ -117,6 +135,7 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
       ▼
 [모델 입력 행렬]
 ```
+<br>
 
 ### 2.2 ① 고객 단위 집계 — `ClaimAggregator(BaseEstimator, TransformerMixin)`
 
@@ -132,6 +151,8 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 | 위험 신호 | `risky_hosp_visits`, `risky_hosp_flag` | H5 |
 
 > **챕터 비중 정책**: EDA에서 의미 있게 나온 8개 챕터(M·S·C·K·I·N·J·D)만 개별 비중으로 두고, 나머지(A·B·E·F·G·H·L·O·P·Q·R·T·V·W·X·Y·Z)는 `etc_ratio` 한 컬럼으로 합산. 노이즈·다중공선성을 줄이고 LR 계수·LightGBM importance를 읽기 좋게.
+
+<br>
 
 ### 2.3 ② sklearn Pipeline (모델 직전 단)
 
@@ -152,11 +173,15 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 >
 > **수치 컬럼 imputer**: `median` 고정. 청구 집계 피처는 결측이 거의 없고 있어도 "청구 없음 = 0"이 자연스러워 `most_frequent`는 의미 약함.
 
+<br>
+
 ### 2.4 데이터 분할 & Leakage 방지
 
 - `DIVIDED_SET=1` (20,607명) — **학습/검증** → `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)`
 - `DIVIDED_SET=2` (1,793명) — **최종 holdout**, 마지막 한 번만 점수 측정
 - 파이프라인 `fit` 은 매 fold의 train 부분에서만 호출 (median·scaler·OHE 카테고리가 valid로 새지 않도록)
+
+<br><br>
 
 ---
 
@@ -171,6 +196,8 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 
 > 본 보고서에서는 **LR vs LightGBM** 2-way 비교를 메인으로 가져간다. XGBoost 는 앙상블 단계 (step09 이후) 에서 합류.
 
+<br>
+
 ### 3.2 평가지표
 
 불균형(8.76%) 분류이므로 단일 지표 X.
@@ -179,12 +206,17 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 - **ROC-AUC** — 관례 보고용
 - **Recall @ Top 10% / Top 20%** — EDA Fig 3 (단순 룰베이스)와 직접 비교 → "룰베이스 Recall 32.9% → 모델 ??%" 메시지
 - **F1, confusion matrix** — 운영 threshold 후보 결정 단계에서
+  
+<br>
 
 ### 3.3 해석
 
 - LightGBM `feature_importance` (gain) + `permutation_importance` (sklearn) 두 가지로 교차 검증
 - 상위 변수가 H1~H5 가설과 일치하는지 점검 → 일치하면 *EDA → 가설 → 모델 검증* 닫힘
 - LR 계수의 부호로 변수 영향 방향성 추가 설명
+
+
+<br>
 
 ### 3.4 오버샘플링 — 시도 후 기각 (step06)
 
@@ -201,18 +233,24 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 
 → **모든 SMOTE 변종이 baseline보다 손해**. **미적용 결정** ([step06](src/step06_oversampling.py)).
 
+<br>
+
 **근거**:
 1. LGBM `scale_pos_weight ≈ 10` 이 이미 imbalance 처리 — 합성 데이터 불필요
 2. 회색 영역 4,500명에서 SMOTE가 *가짜 사기 합성* → 노이즈 증가
 3. 사기 1,806명이 충분히 다양 — 합성 marginal value 작음
 
-> *실험 → 기각* 자체가 정직한 모델링자의 자세.
+> *실험 → 기각*
+
+<br>
 
 ### 3.4.1 Optuna 하이퍼파라미터 탐색 (step07)
 
 ![Optuna 탐색 history](figures/optuna_history.png)
 
 LGBM 30 trial — baseline PR-AUC 0.663 → tuned 0.670 (+0.73pp).
+
+<br>
 
 ### 3.5 피처 엔지니어링 심화 (step10)
 
@@ -243,6 +281,8 @@ EDA의 챕터별 사기율 차이(M 23% vs C 7.8%)를 *모델 신호로 직접 �
 
 두 기법이 additive 하게 누적되어 baseline 대비 PR-AUC +0.29pp.
 
+<br>
+
 ### 3.6 최종 모델 — 피처 개선 × 앙상블 결합 (step11)
 
 step10 의 새 피처를 step09 앙상블에 결합. fold 안에서 interaction + target encoding 둘 다 적용한 뒤 LR + LGBM + XGB 3개 모델 OOF → 가중치 grid search.
@@ -259,6 +299,9 @@ step10 의 새 피처를 step09 앙상블에 결합. fold 안에서 interaction 
 **최종 모델 가중치** (`outputs/ensemble_advanced_best_weights.json`)
 - LR 0.10 · LGBM 0.60 · XGB 0.30
 - step09(기본 피처) 대비 LR 비중↑, XGB 비중↓ — 새 피처가 LR에 도움이 더 컸음
+
+
+<br>
 
 ### 3.7 최종 운영 threshold (step12)
 
@@ -279,6 +322,8 @@ step08의 threshold 0.58은 *LGBM 단일* 기준. 최종 앙상블은 LR이 섞�
 - **운영 시나리오 선택지**:
   - balanced 운영 (P/R 균형): t=0.61, F1 0.630
   - high-recall 운영 (모든 의심자 추출): t=0.50, R 0.668 / P 0.570
+
+<br>
 
 ### 3.8 최종 모델 — Optuna LGBM 통합 (step13)
 
@@ -306,11 +351,16 @@ step07 에서 Optuna 가 찾은 LGBM best params 는 step09~11 에서는 적용�
 - **PR-AUC 0.6678 / R@Top10% 0.665 / R@Top20% 0.834 / F1(t=0.5) 0.623**
 - 5단계 짜낸 결과 — 여기가 데이터 천장 부근으로 추정
 
+
+<br>
+
 ### 3.9 데이터 천장 진단 (step13 시점)
 
 PR-AUC 0.668 시점에서 *현재 사용 변수* 로 짜낼 수 있는 정보는 거의 짜낸 상태로 진단:
 - **회색 영역 4,500명** (전체 22%): 어려운 사기 602명(예측 평균 0.20) + 강한 FP 정상 1,880명(예측 평균 0.53)
 - 다만 **CLAIM 변수 39개 중 8개만 사용** 중. 미사용 31개 변수 활용 시 추가 개선 가능성 잔존.
+
+<br>
 
 ### 3.10 시간 기반 피처 통합 — 천장 돌파 (step14)
 
@@ -331,6 +381,8 @@ PR-AUC 0.668 시점에서 *현재 사용 변수* 로 짜낼 수 있는 정보는
 ![시간 피처 importance](figures/time_feature_importance.png)
 
 > LGBM Top 25 안에 시간 피처 7개 모두 진입 (코랄 막대). 기존 변수들과 어깨를 나란히.
+
+<br>
 
 **최종 6단계 누적 PR-AUC** — `figures/ensemble_progression_v2.png`
 
@@ -353,6 +405,8 @@ PR-AUC 0.668 시점에서 *현재 사용 변수* 로 짜낼 수 있는 정보는
 - **PR-AUC 0.6850 / R@Top10% 0.670 / R@Top20% 0.841 / F1(@0.5) 0.634**
 - 상위 20% 조사로 사기 84.1% 적발 — 실무 KPI 매우 강함
 
+<br>
+
 ### 3.11 천장에 대한 재진단
 
 step13 시점에서 "0.668 이 천장" 이라고 추정했으나 step14 가 **+1.72pp 큰 점프**로 그 진단을 뒤집음. 교훈:
@@ -360,6 +414,8 @@ step13 시점에서 "0.668 이 천장" 이라고 추정했으나 step14 가 **+1
 1. **"천장처럼 보이는 평탄"이 진짜 천장이 아닐 수 있음** — 사용 변수 범위 안에서만의 plateau.
 2. **변수 추가가 가장 큰 ROI** — 모델/앙상블/튜닝 모두 합쳐 +0.86pp, 시간 피처 7개로 +1.72pp.
 3. **새 천장 추정** — 0.685 부근. CLAIM 미사용 변수 (HOUSE_HOSP_DIST, NON_PAY_RATIO, CHME_LICE_NO 등) 추가로 0.69~0.70 도달 가능성 잔존.
+
+<br>
 
 ### 3.12 미사용 변수 8개 통합 — 두 번째 도약 (step15)
 
@@ -401,6 +457,8 @@ EDA로 사기/정상 비율을 검증한 강한 미사용 변수 8개 추가:
 - **PR-AUC 0.6988 / R@Top10% 0.685 / R@Top20% 0.849 / F1(@0.5) 0.643**
 - 상위 20% 조사로 **사기 84.9% 적발**
 
+<br>
+
 ### 3.13 Hybrid scaler 적용 (step17)
 
 step15까지 모든 수치 변수에 RobustScaler 일괄 적용. 그러나 변수 분포 진단 결과 **CUST_INCM, RCBASE_HSHD_INCM, JPBASE_HSHD_INCM 은 거의 정규 분포** (skew < 1). 의미상 같은 그룹(금융/소득) 임에도 TOTALPREM, MAX_PRM, RESI_COST 는 극단 long-tail (skew 3~20).
@@ -410,6 +468,8 @@ step15까지 모든 수치 변수에 RobustScaler 일괄 적용. 그러나 변�
 - Long-tail 변수 (모든 청구 집계 포함) → RobustScaler
 
 **결과**: PR-AUC 0.6988 → **0.7000** (+0.125pp). 트리 모델은 split 기반이라 스케일 무관이나, LGBM 내부 floating-point precision + LR 효과로 미세 개선.
+
+<br>
 
 ### 3.14 과적합 진단 + 정규화 강화 (step18)
 
@@ -448,6 +508,8 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 
 추가 검증 (step19): 더 강한 정규화 시도 → underfit (LGBM 16 iteration만 학습, valid 0.54로 하락). step18이 sweet spot 확인.
 
+<br>
+
 ### 3.15 최종 모델 — 8단계 누적 (step18)
 
 **최종 8단계 누적 PR-AUC** — `figures/ensemble_progression_v4.png`
@@ -473,6 +535,8 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 - **F1 0.657 (best threshold 0.67)** / Precision 0.655 / Recall 0.660
 - Train-Valid gap 0.233 (정규화 강화 후)
 
+<br><br>
+
 ### 3.16 최종 교훈
 
 > **"성능 향상의 80%는 *어떤 변수를 활용했는가* 에서 결정된다."**
@@ -484,6 +548,8 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 
 > 또한 *trade-off 인식*: step19에서 더 강한 정규화로 gap 0.023 달성했으나 valid PR-AUC 0.684 손실 — *과적합과 성능의 균형점*이 step18 (gap 0.233) 임을 실증.
 
+
+<br><br>
 
 ---
 
