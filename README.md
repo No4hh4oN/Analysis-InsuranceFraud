@@ -8,19 +8,24 @@
 
 | 지표 | 값 |
 |---|---|
-| PR-AUC | **0.6988** |
-| Recall@Top10% | 0.685 |
-| Recall@Top20% | **0.849** *(상위 20% 조사로 사기 85% 적발)* |
-| F1 (@t=0.5) | 0.643 |
+| **PR-AUC** | **0.7024** *(Random baseline 0.088 대비 약 8배)* |
+| **ROC-AUC** | **0.9326** |
+| Recall@Top10% | 0.693 |
+| **Recall@Top20%** | **0.854** *(상위 20% 조사로 사기 85% 적발)* |
+| F1 (best t=0.67) | **0.657** *(Precision 0.655 / Recall 0.660)* |
+| F1 (default t=0.5) | 0.624 |
+| Train-Valid Gap | 0.233 *(정규화 강화 후 — step17 대비 22% 감소)* |
 
-[figures/ensemble_progression_v3.png](figures/ensemble_progression_v3.png) — 7단계 누적 PR-AUC 차트
+[figures/ensemble_progression_v4.png](figures/ensemble_progression_v4.png) — **8단계 누적 PR-AUC 차트** (PPT 메인)
+
+[figures/pr_curve_final.png](figures/pr_curve_final.png) — PR curve (3 모델 + Weighted Voting + 운영점 마킹)
 
 ## 디렉토리 구조
 
 ```
 .
 ├── CUST_DATA.csv / CLAIM_DATA.csv   (UTF-16 LE, 한글)
-├── src/                              전처리·피처·모델 모듈 + step01~15
+├── src/                              전처리·피처·모델 모듈 + step01~19
 ├── docs/                             모듈별 설계 문서 8개
 ├── outputs/                          CV / 앙상블 / progression 산출물
 ├── figures/                          EDA / 모델 비교 / progression 차트
@@ -38,7 +43,7 @@ pip install pandas numpy matplotlib seaborn scikit-learn lightgbm xgboost optuna
 python src/step01_data_intro.py
 python src/step02_eda.py
 # ...
-python src/step15_unused_vars.py    # 최종 모델 (PR-AUC 0.6988)
+python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 ```
 
 ---
@@ -90,17 +95,22 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 
 ### 2.3 ② sklearn Pipeline (모델 직전 단)
 
-- **수치 컬럼** → `SimpleImputer(strategy="median")` → **Scaler (비교 축)**
-  - 후보 A: `StandardScaler` (관례·LR 베이스라인 표준)
-  - 후보 B: `RobustScaler` (중앙값·IQR — 지급액·청구건수의 long-tail/이상치에 강건)
+- **수치 컬럼** → `SimpleImputer(strategy="median")` → **Scaler**
+  - `StandardScaler` (관례·LR 베이스라인 표준, 정규 분포 가정)
+  - `RobustScaler` (중앙값·IQR — 지급액·청구건수의 long-tail/이상치에 강건)
+  - **`hybrid` (최종 채택, step17)** — 변수 분포에 따라 차등 적용
 - **범주 컬럼** (성별·직업·거주지 등) → `SimpleImputer(strategy="most_frequent")` → `OneHotEncoder(handle_unknown="ignore")`
 - `ColumnTransformer` 로 묶어 모델 앞단에 부착
 
-> **Scaler 비교 의도**: 우리 집계 피처(지급액·청구건수·입원일수 합계 등)는 사기 고객이 만드는 극단치 때문에 분포가 크게 skewed. `StandardScaler`(평균·표준편차)는 이상치에 끌려갈 수 있고 `RobustScaler`(중앙값·IQR)는 그에 강건하므로 두 스케일러를 비교 후보로 둔다.
+> **Hybrid scaler 정책** ([preprocess.STANDARD_SCALE_COLS](src/preprocess.py)):
+> - **정규 분포 (skew < 1)** → StandardScaler
+>   - `CUST_INCM` (skew -0.09), `RCBASE_HSHD_INCM` (0.16), `JPBASE_HSHD_INCM` (0.50)
+> - **Long-tail (skew ≥ 2)** → RobustScaler
+>   - `RESI_COST` (skew 3.48), `TOTALPREM` (8.50), `MAX_PRM` (20.09), 모든 청구 집계
 >
-> **수치 컬럼 imputer**: `median` 고정. 우리 집계 피처는 결측이 거의 없고 있어도 "청구 없음 = 0"이 자연스러워 `most_frequent`는 의미 약함. (검토 의견 반영, 메인 비교 축에는 포함 안 함.)
+> 변수 분포 진단 후 의미 그룹별로 다른 스케일러 적용. PR-AUC 0.6988 → 0.7000 (+0.125pp, step15 → step17).
 >
-> Scaler·OneHot은 LR(베이스라인)을 위해 필요. LightGBM 단독이면 사실상 불필요하지만, **두 모델이 같은 파이프라인을 공유**하도록 둔다 (실험 단순화).
+> **수치 컬럼 imputer**: `median` 고정. 청구 집계 피처는 결측이 거의 없고 있어도 "청구 없음 = 0"이 자연스러워 `most_frequent`는 의미 약함.
 
 ### 2.4 데이터 분할 & Leakage 방지
 
@@ -319,14 +329,84 @@ EDA로 사기/정상 비율을 검증한 강한 미사용 변수 8개 추가:
 - **PR-AUC 0.6988 / R@Top10% 0.685 / R@Top20% 0.849 / F1(@0.5) 0.643**
 - 상위 20% 조사로 **사기 84.9% 적발**
 
-### 3.13 최종 교훈 (PPT 마무리)
+### 3.13 Hybrid scaler 적용 (step17)
+
+step15까지 모든 수치 변수에 RobustScaler 일괄 적용. 그러나 변수 분포 진단 결과 **CUST_INCM, RCBASE_HSHD_INCM, JPBASE_HSHD_INCM 은 거의 정규 분포** (skew < 1). 의미상 같은 그룹(금융/소득) 임에도 TOTALPREM, MAX_PRM, RESI_COST 는 극단 long-tail (skew 3~20).
+
+→ **분포 기반 분리 적용**:
+- 정규 분포 3개 → StandardScaler
+- Long-tail 변수 (모든 청구 집계 포함) → RobustScaler
+
+**결과**: PR-AUC 0.6988 → **0.7000** (+0.125pp). 트리 모델은 split 기반이라 스케일 무관이나, LGBM 내부 floating-point precision + LR 효과로 미세 개선.
+
+### 3.14 과적합 진단 + 정규화 강화 (step18)
+
+step17 시점 train-valid gap 진단:
+
+```
+fold별 train vs valid PR-AUC
+  fold 1  train 0.999  valid 0.642  gap +0.357
+  fold 2  train 0.999  valid 0.704  gap +0.295
+  ...
+  평균     train 0.999  valid 0.700  gap +0.300
+```
+
+**Train 0.999 vs Valid 0.700 — Gap 0.30 = 과적합 시그널.**
+Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_leaves=90`, `n_estimators=796`)가 너무 강함.
+
+**LGBM 정규화 강화**:
+| Param | step17 (Optuna) | step18 (정규화) | 의미 |
+|---|---|---|---|
+| `num_leaves` | 90 | **31** | 트리 단순화 |
+| `min_child_samples` | 63 | **100** | 작은 leaf 차단 |
+| `subsample` | 0.77 | 0.7 | 트리마다 70% 샘플 |
+| `colsample_bytree` | 0.88 | 0.7 | 트리마다 70% 피처 |
+| `reg_lambda` | 8.0 | **20.0** | L2 정규화 2.5배 |
+| `reg_alpha` | ~0 | 0.1 | L1 정규화 추가 |
+| `n_estimators` | 796 | 500 | 트리 수 ↓ |
+
+**결과 — Win-Win**:
+- **Gap 0.300 → 0.233 (22% 감소)**
+- **Valid PR-AUC 0.700 → 0.700 (유지)**
+- **Final voting PR-AUC 0.7000 → 0.7024 (+0.024pp)**
+
+추가 검증 (step19): 더 강한 정규화 시도 → underfit (LGBM 16 iteration만 학습, valid 0.54로 하락). step18이 sweet spot 확인.
+
+### 3.15 최종 모델 — 8단계 누적 (step18)
+
+**최종 8단계 누적 PR-AUC** — `figures/ensemble_progression_v4.png` (PPT 메인)
+
+| 단계 | PR-AUC | Δ from baseline |
+|---|---|---|
+| baseline (LGBM 단일) | 0.6592 | – |
+| +피처개선 (interaction + TE) | 0.6621 | +0.29pp |
+| +앙상블 (기본피처) | 0.6654 | +0.62pp |
+| +피처+앙상블 (step11) | 0.6658 | +0.66pp |
+| +Optuna LGBM (step13) | 0.6678 | +0.86pp |
+| +시간 피처 (step14) | 0.6850 | +2.58pp |
+| +미사용 변수 (step15) | 0.6988 | +3.96pp |
+| **+Hybrid scaler + 정규화 (최종, step17~18)** | **0.7024** | **+4.32pp** |
+
+**최종 모델 가중치** (`outputs/step18_regularized.json`)
+- **LR 0.05 · LGBM 0.35 · XGB 0.60**
+- step15 대비 XGB 비중 ↑ (0.30→0.60) — LGBM 정규화로 약해진 만큼 XGB가 더 큰 역할
+
+**최종 성능**
+- **PR-AUC 0.7024 / ROC-AUC 0.9326**
+- **R@Top10% 0.693 / R@Top20% 0.854** (상위 20% 조사로 사기 85% 적발)
+- **F1 0.657 (best threshold 0.67)** / Precision 0.655 / Recall 0.660
+- Train-Valid gap 0.233 (정규화 강화 후)
+
+### 3.16 최종 교훈 (PPT 마무리)
 
 > **"성능 향상의 80%는 *어떤 변수를 활용했는가* 에서 결정된다."**
 >
-> - 모델 측면 (앙상블 + Optuna + 다양한 알고리즘): +0.86pp
+> - 모델 측면 (앙상블 + Optuna + 다양한 알고리즘 + 정규화): +1.22pp
 > - 변수 측면 (interaction + target encoding + 시간 + 미사용): **+3.10pp**
 >
-> 미사용 변수 진단(`HOSP_OTPA`, `NON_PAY_RATIO`, `CHME_LICE_NO` 등)이 모델 튜닝보다 압도적으로 ROI가 좋음.
+> 모델 튜닝보다 *미사용 변수 진단* (`HOSP_OTPA`, `NON_PAY_RATIO`, `CHME_LICE_NO`, `RECP_DATE` 등) 이 압도적 ROI. **데이터를 깊이 이해하는 것이 가장 큰 레버리지**.
+
+> 또한 *trade-off 인식*: step19에서 더 강한 정규화로 gap 0.023 달성했으나 valid PR-AUC 0.684 손실 — *과적합과 성능의 균형점*이 step18 (gap 0.233) 임을 실증.
 
 
 ---
@@ -350,7 +430,11 @@ src/
 ├── step12_threshold_final.py      ← 최종 앙상블의 운영 threshold tuning
 ├── step13_ensemble_optuna.py      ← Optuna LGBM + 새 피처 + 3-모델
 ├── step14_time_features.py        ← 시간 피처 7개 추가 (PR-AUC 0.685)
-└── step15_unused_vars.py          ← 미사용 변수 8개 추가 — 최종 모델 (PR-AUC 0.699)
+├── step15_unused_vars.py          ← 미사용 변수 8개 추가 (PR-AUC 0.699)
+├── step16_pr_curve.py             ← 최종 앙상블 PR curve 시각화
+├── step17_hybrid_scaler.py        ← Hybrid scaler (StandardScaler + RobustScaler 분리)
+├── step18_regularized.py          ← 과적합 진단 + 정규화 강화 — 최종 모델 (PR-AUC 0.7024)
+└── step19_strong_reg.py           ← 더 강한 정규화 + early stopping (underfit 검증)
 ```
 
 각 모듈은 한국어 docstring + 팀원이 따라 읽을 주석을 충분히 단다. 크로스 플랫폼(Windows 팀원) 고려해 경로는 `pathlib.Path`, 폰트는 `io_utils.setup_korean_font()` 사용.
@@ -359,8 +443,13 @@ src/
 
 ## 5. 산출물 (PPT 슬라이드 연결)
 
-| 슬라이드 흐름 | 본 설계서에서 만드는 산출물 |
+| 슬라이드 흐름 | 산출물 |
 |---|---|
-| 전처리 | `src/features.py`, `src/preprocess.py` — 클래스/함수 단위 모듈, 다이어그램(섹션 2.1) |
-| 모델링·평가 | `src/model.py`, `step04_train.py` — LR/LightGBM 비교 표, PR·ROC 곡선, Recall@Top K 표 |
-| 해석 | feature importance 막대 그래프 (Top 15) — 가설 H1~H5 검증 |
+| **EDA** | `figures/eda_01~06_*.png` (기본), `figures/eda_kcd_01~05_*.png` (KCD 챕터 심화), `figures/eda_new_01~03_*.png` (추가 변수) |
+| **전처리** | `src/features.py` (집계 + interaction + target encoding + 시간 + 미사용변수 헬퍼), `src/preprocess.py` (Hybrid scaler) |
+| **모델링·평가** | `src/model.py`, `figures/feature_importance_lgbm.png` / `_lr.png`, `figures/pr_curve_final.png` |
+| **최적화 — 변수 탐색** | `figures/feature_ablation.png` / `_delta.png` (interaction + TE), `figures/time_feature_importance.png` (시간 피처), `figures/unused_feature_importance.png` (미사용 변수) |
+| **최적화 — 오버샘플링** | `figures/oversample_compare.png` (SMOTE 4-way 비교 — 미적용 결정 근거) |
+| **최적화 — 하이퍼파라미터** | `figures/optuna_history.png`, `figures/optuna_param_importance.png`, `figures/overfit_compare.png` (정규화 효과) |
+| **최종 결과** ⭐ | `figures/ensemble_progression_v4.png` (8단계 누적 PR-AUC, PPT 메인), `figures/pr_curve_final.png` (PR curve + 운영점) |
+| **수치 표** | `outputs/step18_regularized.json` (최종 모델), `outputs/ensemble_progression_v4.csv` (단계별 누적) |
