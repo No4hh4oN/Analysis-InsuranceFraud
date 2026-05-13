@@ -16,9 +16,19 @@
 | F1 (default t=0.5) | 0.624 |
 | Train-Valid Gap | 0.233 *(정규화 강화 후 — step17 대비 22% 감소)* |
 
-[figures/ensemble_progression_v4.png](figures/ensemble_progression_v4.png) — **8단계 누적 PR-AUC 차트** (PPT 메인)
+### 단계별 누적 PR-AUC — 베이스라인 0.6592 → 최종 0.7024 (+4.32pp)
 
-[figures/pr_curve_final.png](figures/pr_curve_final.png) — PR curve (3 모델 + Weighted Voting + 운영점 마킹)
+![최종 8단계 누적 PR-AUC](figures/ensemble_progression_v4.png)
+
+> Baseline (LGBM 단일) 에서 출발해 *피처 개선 → 앙상블 → Optuna LGBM → 시간 피처 → 미사용 변수 → Hybrid scaler → 정규화* 8단계 누적.
+> **모델 측면 +1.22pp vs 변수 측면 +3.10pp** — 변수 탐색이 압도적 ROI.
+
+### PR Curve — 3개 모델 + Weighted Voting + 운영점
+
+![PR Curve 최종](figures/pr_curve_final.png)
+
+> Random baseline(8.8%) 대비 약 8배 위. **상위 20% 조사로 사기 84.9% 적발**.
+> LR(회색 점선) 대비 트리 모델·앙상블이 명확한 우위 — *사기 탐지는 비선형 패턴*.
 
 ## 디렉토리 구조
 
@@ -48,7 +58,37 @@ python src/step18_regularized.py    # 최종 모델 (PR-AUC 0.7024)
 
 ---
 
-## 1. 가설
+## 1. EDA 핵심 발견
+
+### 1.1 타겟 분포 — 사기율 8.76% 불균형
+
+![타겟 분포](figures/eda_01_target.png)
+
+### 1.2 KCD 챕터별 사기율 — M(요추) 23% vs C(암) 7.8% (3배 차이)
+
+![KCD 챕터 분석](figures/eda_kcd_02_dual_bar.png)
+
+> 진단명 카테고리에 따라 사기율 격차 매우 큼. *M(근골격계)·S(손상)·J(호흡기)* 가 고위험,
+> *C(암)* 는 오히려 정직 (진짜 환자가 많음). → 단순 챕터 비율 변수보다 *챕터별 사기율 prior*
+> 를 직접 주입하면 효과 클 것 (step10 target encoding 동기).
+
+### 1.3 청구 패턴 다양성 — Doctor Shopping 신호
+
+![청구 신호](figures/eda_04_claim_signal.png)
+
+> 사기 고객은 **청구 3배 · 방문 병원 2.6배 · 의사 6.5배 · 진단명 3.2배** 빈도.
+> 한 사람이 여러 곳을 돌아다니며 청구하는 *doctor shopping* 패턴이 매우 강한 신호.
+
+### 1.4 입원·지급액 long-tail 분포
+
+![수치형 box plot](figures/eda_03_numeric_box.png)
+
+> 모든 청구 집계 변수가 *극단치 = 사기 시그널* 패턴. 입원일수 합계 6.5배, 요주의병원 방문 4.5배.
+> **이상치 제거하지 않음** — 꼬리(tail)가 사기 답이기 때문. RobustScaler 로 흡수.
+
+---
+
+## 1.5 가설 — EDA 시그널의 모델링 검증 가능 형태
 
 EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 후 변수 중요도로 다시 닫는다.
 
@@ -146,11 +186,33 @@ EDA에서 관찰된 시그널을 검증 가능한 형태로 정리. 모델링 �
 - 상위 변수가 H1~H5 가설과 일치하는지 점검 → 일치하면 PPT 스토리 닫힘
 - LR 계수의 부호로 변수 영향 방향성 추가 설명
 
-### 3.4 최적화 단계 (다음 챕터, 본 설계서 범위 밖)
+### 3.4 오버샘플링 — 시도 후 기각 (step06)
 
-- 오버샘플링 (`SMOTE`, `BorderlineSMOTE`) — 학습 fold 안에서만 적용
-- Threshold tuning (PR 곡선에서 F1 최댓점)
-- Optuna 하이퍼파라미터 탐색
+`scale_pos_weight ≈ 10` 베이스라인 vs SMOTE / BorderlineSMOTE / SMOTETomek 4-way 비교.
+
+![오버샘플링 4-way 비교](figures/oversample_compare.png)
+
+| 전략 | PR-AUC ± std | F1 |
+|---|---|---|
+| **baseline** (scale_pos_weight) | **0.663 ± 0.020** | **0.621** |
+| SMOTE | 0.661 ± 0.026 | 0.596 |
+| BorderlineSMOTE | 0.660 ± 0.029 | 0.600 |
+| SMOTETomek | 0.660 ± 0.024 | 0.590 |
+
+→ **모든 SMOTE 변종이 baseline보다 손해**. **미적용 결정** ([step06](src/step06_oversampling.py)).
+
+**근거**:
+1. LGBM `scale_pos_weight ≈ 10` 이 이미 imbalance 처리 — 합성 데이터 불필요
+2. 회색 영역 4,500명에서 SMOTE가 *가짜 사기 합성* → 노이즈 증가
+3. 사기 1,806명이 충분히 다양 — 합성 marginal value 작음
+
+> *실험 → 기각* 자체가 정직한 모델링자의 자세.
+
+### 3.4.1 Optuna 하이퍼파라미터 탐색 (step07)
+
+![Optuna 탐색 history](figures/optuna_history.png)
+
+LGBM 30 trial — baseline PR-AUC 0.663 → tuned 0.670 (+0.73pp).
 
 ### 3.5 피처 엔지니어링 심화 (step10)
 
@@ -176,6 +238,8 @@ EDA의 챕터별 사기율 차이(M 23% vs C 7.8%)를 *모델 신호로 직접 �
 | +interaction | 0.6608 (+0.16pp) | 0.661 | 0.822 |
 | +target_enc | 0.6611 (+0.19pp) | 0.657 | 0.826 |
 | **+both** | **0.6621 (+0.29pp)** | 0.658 | 0.822 |
+
+![피처 개선 ablation 결과](figures/feature_ablation_delta.png)
 
 두 기법이 additive 하게 누적되어 baseline 대비 PR-AUC +0.29pp.
 
@@ -264,6 +328,10 @@ PR-AUC 0.668 시점에서 *현재 사용 변수* 로 짜낼 수 있는 정보는
 
 > 사기 고객은 *사고 후 평균 218일* 에 청구 (정상 127일), *활동 기간 1,438일* (정상 736일). "사고 후 늦게 + 오래 청구" 패턴.
 
+![시간 피처 importance](figures/time_feature_importance.png)
+
+> LGBM Top 25 안에 시간 피처 7개 모두 진입 (코랄 막대). 기존 변수들과 어깨를 나란히.
+
 **최종 6단계 누적 PR-AUC** — `figures/ensemble_progression_v2.png`
 
 | 단계 | PR-AUC | Δ from baseline |
@@ -307,6 +375,10 @@ EDA로 사기/정상 비율을 검증한 강한 미사용 변수 8개 추가:
 | `hosp_otpa_mean/max` | 입원기간 평균/최대 | 1.19배 |
 
 > 핵심 발견: 우리는 `n_hospital`(병원 수)만 봤지만, **같은 병원 안에서 의사 옮기는 doctor shopping**(의사 6.5명 vs 2.3명)을 못 잡고 있었음.
+
+![미사용 변수 피처 importance](figures/unused_feature_importance.png)
+
+> 빨강 = 미사용 변수 (step15 추가), 코랄 = 시간 피처, 회색 = 기존. 새 변수 7개가 Top 25 안에.
 
 **최종 7단계 누적 PR-AUC** — `figures/ensemble_progression_v3.png`
 
@@ -369,6 +441,10 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 - **Gap 0.300 → 0.233 (22% 감소)**
 - **Valid PR-AUC 0.700 → 0.700 (유지)**
 - **Final voting PR-AUC 0.7000 → 0.7024 (+0.024pp)**
+
+![과적합 진단 + 정규화 효과](figures/overfit_compare.png)
+
+> 좌: Train-Valid gap 22% 감소 / 우: Valid PR-AUC 유지. *과적합 ↓ 와 성능 ↑ 가 동시에*.
 
 추가 검증 (step19): 더 강한 정규화 시도 → underfit (LGBM 16 iteration만 학습, valid 0.54로 하락). step18이 sweet spot 확인.
 
