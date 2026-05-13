@@ -397,7 +397,7 @@ Boosting 모델의 일반적 train fit 강도 + LGBM Optuna 파라미터(`num_le
 - **F1 0.657 (best threshold 0.67)** / Precision 0.655 / Recall 0.660
 - Train-Valid gap 0.233 (정규화 강화 후)
 
-### 3.16 최종 교훈 (PPT 마무리)
+### 3.16 최종 교훈
 
 > **"성능 향상의 80%는 *어떤 변수를 활용했는가* 에서 결정된다."**
 >
@@ -436,20 +436,3 @@ src/
 ├── step18_regularized.py          ← 과적합 진단 + 정규화 강화 — 최종 모델 (PR-AUC 0.7024)
 └── step19_strong_reg.py           ← 더 강한 정규화 + early stopping (underfit 검증)
 ```
-
-각 모듈은 한국어 docstring + 팀원이 따라 읽을 주석을 충분히 단다. 크로스 플랫폼(Windows 팀원) 고려해 경로는 `pathlib.Path`, 폰트는 `io_utils.setup_korean_font()` 사용.
-
----
-
-## 5. 산출물 (PPT 슬라이드 연결)
-
-| 슬라이드 흐름 | 산출물 |
-|---|---|
-| **EDA** | `figures/eda_01~06_*.png` (기본), `figures/eda_kcd_01~05_*.png` (KCD 챕터 심화), `figures/eda_new_01~03_*.png` (추가 변수) |
-| **전처리** | `src/features.py` (집계 + interaction + target encoding + 시간 + 미사용변수 헬퍼), `src/preprocess.py` (Hybrid scaler) |
-| **모델링·평가** | `src/model.py`, `figures/feature_importance_lgbm.png` / `_lr.png`, `figures/pr_curve_final.png` |
-| **최적화 — 변수 탐색** | `figures/feature_ablation.png` / `_delta.png` (interaction + TE), `figures/time_feature_importance.png` (시간 피처), `figures/unused_feature_importance.png` (미사용 변수) |
-| **최적화 — 오버샘플링** | `figures/oversample_compare.png` (SMOTE 4-way 비교 — 미적용 결정 근거) |
-| **최적화 — 하이퍼파라미터** | `figures/optuna_history.png`, `figures/optuna_param_importance.png`, `figures/overfit_compare.png` (정규화 효과) |
-| **최종 결과** ⭐ | `figures/ensemble_progression_v4.png` (8단계 누적 PR-AUC, PPT 메인), `figures/pr_curve_final.png` (PR curve + 운영점) |
-| **수치 표** | `outputs/step18_regularized.json` (최종 모델), `outputs/ensemble_progression_v4.csv` (단계별 누적) |
