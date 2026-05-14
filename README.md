@@ -21,7 +21,7 @@
 
 ### 단계별 누적 PR-AUC — 베이스라인 0.6592 → 최종 0.7024 (+4.32pp)
 
-![최종 8단계 누적 PR-AUC](figures/ensemble_progression_v4.png)
+![최종 8단계 누적 PR-AUC](figures/ensemble_progression_line.png)
 
 > Baseline (LGBM 단일) 에서 출발해 *피처 개선 → 앙상블 → Optuna LGBM → 시간 피처 → 미사용 변수 → Hybrid scaler → 정규화* 8단계 누적.
 > **모델 측면 +1.22pp vs 변수 측면 +3.10pp** — 변수 탐색이 압도적 ROI.
